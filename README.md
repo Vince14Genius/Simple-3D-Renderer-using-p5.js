@@ -3,7 +3,9 @@ A simple 3D renderer, created using the library p5.js, only supports rotation al
 
 ## Instructions & Controls
 
-Open index.html with any browser that is compatible with the p5.js library to run. 
+(Online) https://Vince14Genius.github.io/Simple-3D-Renderer-using-p5.js/ 
+
+(If downloaded) Open index.html 
 
 Movement: WASD or arrow keys (x and z axes), Space (y-upward), and Shift (y-downward)
 
