@@ -1,17 +1,15 @@
 // Author: Vincent C. (Vince14Genius)
 // Code compressed for presentation reasons
 
-/* Togglable Variables */
-
+// Togglable Variables
 var cameraRange = 1000
 var worldHeightBound = 50, worldWidthBound = 200, worldDepthBound = 200
 
-/* Essential variables */
-
+// Essential variables
 var objectsInWorld = []
 var activeCamera = null
 
-/* Object declarations */
+/* Object & function declarations */
 
 class Vector {
     /// Create a vector object using regular 3D coordinates
@@ -24,16 +22,38 @@ class Vector {
     magnitude() { return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z) }
 }
 
-/// GET the scalar product of two vectors
+/// Calculate the scalar product of two vectors
 function scalarProduct(vectorA, vectorB) {
     return vectorA.x * vectorB.x + vectorA.y * vectorB.y + vectorA.z * vectorB.z
 }
 
-/// GET the angle between two vectors using the arc-cosine of the scalar product
+/// Calculate the angle between two vectors using the arc-cosine of the scalar product
 function angleBetweenVectors(vectorA, vectorB) {
     var scalarProductOfVectors = scalarProduct(vectorA, vectorB)
     var productOfMagnitudes = vectorA.magnitude() * vectorB.magnitude()
     return Math.acos(scalarProductOfVectors / productOfMagnitudes)
+}
+
+/// A function from my mathematical work
+function computeAngle(visionAngle, directionalAngle, complementAngle) {
+    var numerator = Math.pow(visionAngle, 2) + Math.pow(directionalAngle, 2) - Math.pow(complementAngle, 2)
+    var denominator = 2 * visionAngle * directionalAngle
+    return Math.acos(numerator / denominator)
+}
+
+/// A function from my mathematical work
+function computeRPoint(r0, visionAngle, thetaPoint) {
+    return r0 * (thetaPoint / visionAngle)
+}
+
+/// A function from my mathematical work
+function computeScreenX(rPoint, planeAngle) {
+    return rPoint * Math.cos(planeAngle)
+}
+
+/// A function from my mathematical work
+function computeScreenY(rPoint, planeAngle) {
+    return rPoint * Math.sin(planeAngle)
 }
 
 class Point extends Vector {
@@ -56,57 +76,46 @@ class Point extends Vector {
         return true
     }
 
+    // GET the point's relative positional vector to the camera
+    getPointRelativeToCamera(camera) {
+        return new Vector(this.x - camera.x, this.y - camera.y, this.z - camera.z)
+    }
+
+    // GET the angle to the camera's directional vector
+    getAngleToDirectionalVector(camera) {
+        var pointRelativeToCamera = this.getPointRelativeToCamera(camera)
+        var cameraDirection = new Vector(Math.cos(camera.yRotation), 0, Math.sin(camera.yRotation))
+        return angleBetweenVectors(pointRelativeToCamera, cameraDirection)
+    }
+
+    // GET the angle to the camera's complement vector
+    getAngleToComplementVector(camera) {
+        var pointRelativeToCamera = this.getPointRelativeToCamera(camera)
+        var complementVector = new Vector(Math.cos(camera.yRotation + camera.visionAngle), 0, Math.sin(camera.yRotation + camera.visionAngle))
+        return angleBetweenVectors(pointRelativeToCamera, complementVector)
+    }
+
     /// GET the point's translated position on the 2D screen
     renderPositionInCamera(camera) {
         var screenDiagonalRadius = Math.sqrt(Math.pow(windowWidth / 2, 2) + Math.pow(windowHeight / 2, 2))
 
-        /* Represent the point and the camera as vectors */
+        var angleToDirectionalVector = this.getAngleToDirectionalVector(camera)
+        var angleToComplementVector = this.getAngleToComplementVector(camera)
 
-        var pointRelativeToCamera = new Vector(this.x - camera.x, this.y - camera.y, this.z - camera.z)
-        var cameraDirection = new Vector(Math.cos(camera.yRotation), 0, Math.sin(camera.yRotation))
-        var angle = angleBetweenVectors(pointRelativeToCamera, cameraDirection)
+        var planeAngle = computeAngle(camera.visionAngle, angleToDirectionalVector, angleToComplementVector)
+        var rPoint = computeRPoint(screenDiagonalRadius, camera.visionAngle, angleToDirectionalVector)
 
-        /* Determine the exact 2D position of the point using two additional vectors */
+        var screenX = computeScreenX(rPoint, planeAngle)
+        var screenY = computeScreenY(rPoint, planeAngle)
 
-        // A horizontally rotated (relative to camera angle) vector that helps create two intersections
-        var complementVector = new Vector(Math.cos(camera.yRotation + camera.visionAngle), 0, Math.sin(camera.yRotation + camera.visionAngle))
-
-        // A vertically rotated (relative to camera angle) vector that helps choose from the two intersections
-        var determinantVector = new Vector(Math.cos(camera.yRotation), Math.sin(-camera.visionAngle), Math.sin(camera.yRotation))
-
-        var angleToComplementVector = angleBetweenVectors(pointRelativeToCamera, complementVector)
-        var angleToDeterminantVector = angleBetweenVectors(pointRelativeToCamera, determinantVector)
-
-        // based on the Law of Cosines, we can deduce that the cosine of the angle
-        // between the horizontal midline (d) and the line from the center to an intersection (r)
-        // is given by (d^2 + r^2 - R^2) / 2dr
-        // where R is the line from the other center to the intersection
-        var numeratorOfCos = Math.pow(camera.visionAngle, 2) + Math.pow(angle, 2) - Math.pow(angleToComplementVector, 2)
-        var denominatorOfCos = 2 * camera.visionAngle * angle
-        var cosineToIntersection = numeratorOfCos / denominatorOfCos
-
-        // since angle is horizontal, use cosine for xProjection and sine for yProjection
-        var xProjection = angle * cosineToIntersection / camera.visionAngle
-        var yProjection = angle * Math.sin(Math.acos(cosineToIntersection)) / camera.visionAngle
-
-        /* test which of the two intersections to use */
-
-        var nocDeterminant = Math.pow(camera.visionAngle, 2) + Math.pow(angle, 2) - Math.pow(angleToDeterminantVector, 2)
-        var docDeterminant = 2 * camera.visionAngle * angle
-        var ctiDeterminant = nocDeterminant / docDeterminant
-        var xOnScreen, yOnScreen
-
+        // Test which of the two intersections to use (inverted because p5.js coordinates are inverted from Cartesian)
         if (this.y > camera.y) {
             // above midline
-            xOnScreen = windowWidth / 2 + xProjection * screenDiagonalRadius
-            yOnScreen = windowHeight / 2 - yProjection * screenDiagonalRadius
+            return [screenX + screenDiagonalRadius / 2, -screenY + screenDiagonalRadius / 2]
         } else {
             // below midline
-            xOnScreen = windowWidth / 2 + xProjection * screenDiagonalRadius
-            yOnScreen = windowHeight / 2 + yProjection * screenDiagonalRadius
+            return [screenX + screenDiagonalRadius / 2, screenY + screenDiagonalRadius / 2]
         }
-
-        return [xOnScreen, yOnScreen]
     }
 }
 
@@ -153,9 +162,7 @@ class Triangle {
         var caseMeanUnrenderable = distanceToCenter > screenDiagonalRadius
         var casePointsUnrenderable = !this.pointA.shouldRenderInCamera(camera) && !this.pointB.shouldRenderInCamera(camera) && !this.pointC.shouldRenderInCamera(camera)
 
-        if (caseMeanUnrenderable && casePointsUnrenderable) {
-            return
-        }
+        if (caseMeanUnrenderable && casePointsUnrenderable) return
 
         noStroke()
         fill(this.color.red, this.color.green, this.color.blue, this.color.alpha)
@@ -229,18 +236,12 @@ function createPyramid(x, y, z, sideLength) {
     ]
 
     var triangleIndices = [
-        // front
-        [4, 0, 1],
-        // back
-        [4, 2, 3],
-        // left
-        [4, 0, 2],
-        // right
-        [4, 1, 3],
-        // bottom1
-        [0, 1, 2],
-        // bottom2
-        [1, 2, 3],
+        // front & back
+        [4, 0, 1], [4, 2, 3],
+        // left & right
+        [4, 0, 2], [4, 1, 3],
+        // bottom
+        [0, 1, 2], [1, 2, 3],
     ]
 
     addTrianglesFromPointGroup(points, triangleIndices)
@@ -260,18 +261,14 @@ function createTowerShape(x, y, z, sideLength) {
     createPyramid(x, y - 2 * sideLength, z, sideLength)
 }
 
-/* Variables for keyboard & mouse control */
-
+// Variables for keyboard & mouse control
 var oldMouseX = null
-
 var leftKeyDown = false, rightKeyDown = false, upKeyDown = false, downKeyDown = false
 var wKeyDown = false, aKeyDown = false, sKeyDown = false, dKeyDown = false
 var shiftKeyDown = false, spaceKeyDown = false
-
 var paused = false
 
-/* FPS Engine*/
-
+// FPS Engine
 var fpsEngine = {
     oldTime: 0, fpsCooldown: 0, displayFPS: 0, realFPS: 0, 
     updateFPS: function() {
@@ -309,18 +306,10 @@ function setup() {
         objectsInWorld.push(new Triangle(pointA, pointB, pointC, color))
     }
 
-    // Add 20 cubes into the 3D world
+    // Add 20 cubes, pyramids, and weird tower shapes into the 3D world
     for (var i = 0; i < 20; i++) {
         createCube(normalizedRandom(worldWidthBound), normalizedRandom(worldHeightBound), normalizedRandom(worldDepthBound), Math.random() * 4 + 2)
-    }
-
-    // Add 20 pyramids into the 3D world
-    for (var i = 0; i < 20; i++) {
         createPyramid(normalizedRandom(worldWidthBound), normalizedRandom(worldHeightBound), normalizedRandom(worldDepthBound), Math.random() * 4 + 2)
-    }
-
-    // Add 20 weird tower shapes into the 3D world
-    for (var i = 0; i < 20; i++) {
         createTowerShape(normalizedRandom(worldWidthBound), normalizedRandom(worldHeightBound), normalizedRandom(worldDepthBound), Math.random() * 4 + 2)
     }
 }
@@ -328,11 +317,9 @@ function setup() {
 function draw() {
     /* draw() runs every time before a new frame is rendered.  */
 
-    /* Pause screen appears when paused */
-
+    // Pause screen appears when paused
     if (paused) {
-        fill(200, 255, 255)
-        stroke(0); strokeWeight(32)
+        fill(200, 255, 255); stroke(0); strokeWeight(32)
         textAlign(CENTER, CENTER); textSize(64)
         text("- P A U S E D -", windowWidth / 2, windowHeight / 2)
         return
