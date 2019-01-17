@@ -1,4 +1,4 @@
-// Author: Vincent C. (Vince14Genius)
+// Author: Vince14Genius
 // Code compressed for presentation reasons
 
 // Togglable Variables
