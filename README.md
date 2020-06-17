@@ -1,5 +1,8 @@
 # Simple-3D-Renderer-using-p5.js
-A simple 3D renderer, created using the library p5.js, only supports rotation along the y-axis (movement is allowed on all axes); it is done by translating points from 3D space to a 2D screen using simple vector &amp; trig operations, and this project is used for my Math IA. 
+
+A simple 3D renderer, created using the 2D graphics library p5.js. It only supports rotation along the y-axis (movement is allowed on all axes), and works by translating points from 3D space to a 2D screen using simple vector & trig operations. 
+
+This project is created for my Math IA, an assignment for the higher level mathematics course in the International Baccalaureate program.
 
 ## Instructions & Controls
 
